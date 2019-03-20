@@ -702,7 +702,7 @@ public class RskContext implements NodeBootstrapper {
         }
 
         int statesCacheSize = rskSystemProperties.getStatesCacheSize();
-        KeyValueDataSource ds = makeDataSource("state", databaseDir);
+        KeyValueDataSource ds = makeDataSource("unitrie", databaseDir);
 
         if (statesCacheSize != 0) {
             ds = new DataSourceWithCache(ds, statesCacheSize);
@@ -1367,7 +1367,7 @@ public class RskContext implements NodeBootstrapper {
         return new IndexedBlockStore(blockFactory, indexMap, blocksDB, indexDB);
     }
 
-    private static KeyValueDataSource makeDataSource(String name, String databaseDir) {
+    public static KeyValueDataSource makeDataSource(String name, String databaseDir) {
         KeyValueDataSource ds = new LevelDbDataSource(name, databaseDir);
         ds.init();
         return ds;

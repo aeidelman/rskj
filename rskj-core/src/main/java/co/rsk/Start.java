@@ -17,8 +17,13 @@
  */
 package co.rsk;
 
+import co.rsk.cli.migration.UnitrieMigrationTool;
+import org.ethereum.core.Block;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 /**
  * The entrypoint for the RSK full node
@@ -28,6 +33,8 @@ public class Start {
 
     public static void main(String[] args) {
         RskContext ctx = new RskContext(args);
+        migrateStateToUnitrieIfNeeded(ctx);
+
         NodeRunner runner = ctx.getNodeRunner();
         try {
             runner.run();
@@ -37,5 +44,46 @@ public class Start {
             runner.stop();
             System.exit(1);
         }
+    }
+
+    // this feature is only needed until the secondFork (TBD) network upgrade is activated.
+    // the whole method should be deleted after that.
+    private static void migrateStateToUnitrieIfNeeded(RskContext ctx) {
+        String databaseDir = ctx.getRskSystemProperties().databaseDir();
+        // we need to check these before the data sources are init'ed
+        boolean hasUnitrieState = Files.exists(Paths.get(databaseDir, "unitrie"));
+        boolean hasOldState = Files.exists(Paths.get(databaseDir, "state"));
+        if (hasUnitrieState) {
+            // the node has been migrated
+            return;
+        }
+
+        if (!hasOldState) {
+            // node first start or after reset
+            return;
+        }
+
+        // this block number has to be validated before the release to ensure the migration works fine for every user
+        long minimumBlockNumberToMigrate = ctx.getRskSystemProperties().getDatabaseMigrationMinimumHeight();
+        Block blockToMigrate = ctx.getBlockStore().getBestBlock();
+        if (blockToMigrate == null || blockToMigrate.getNumber() < minimumBlockNumberToMigrate) {
+            logger.error(
+                    "The database can't be migrated because the node wasn't up to date before upgrading. " +
+                    "Please reset the database or sync past block {} with the previous version to continue.",
+                    minimumBlockNumberToMigrate
+            );
+            logger.error("Reset database or continue syncing with previous version");
+            System.exit(1);
+        }
+
+        UnitrieMigrationTool unitrieMigrationTool = new UnitrieMigrationTool(
+                blockToMigrate,
+                databaseDir,
+                ctx.getRepository(),
+                ctx.getStateRootHandler(),
+                ctx.getTrieConverter()
+        );
+
+        unitrieMigrationTool.migrate();
     }
 }
