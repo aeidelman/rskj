@@ -207,6 +207,7 @@ public class MainNetMinerTest {
                 transactionPool,
                 new DifficultyCalculator(config.getActivationConfig(), config.getNetworkConstants()),
                 new GasLimitCalculator(config.getNetworkConstants()),
+                new ForkDetectionDataCalculator(),
                 unclesValidationRule,
                 clock,
                 blockFactory,

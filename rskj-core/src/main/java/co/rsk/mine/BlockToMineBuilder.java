@@ -68,6 +68,8 @@ public class BlockToMineBuilder {
 
     private final Coin minerMinGasPriceTarget;
 
+    private final ForkDetectionDataCalculator forkDetectionDataCalculator;
+
     public BlockToMineBuilder(
             ActivationConfig activationConfig,
             MiningConfig miningConfig,
@@ -77,6 +79,7 @@ public class BlockToMineBuilder {
             TransactionPool transactionPool,
             DifficultyCalculator difficultyCalculator,
             GasLimitCalculator gasLimitCalculator,
+            ForkDetectionDataCalculator forkDetectionDataCalculator,
             BlockValidationRule validationRules,
             MinerClock clock,
             BlockFactory blockFactory,
@@ -89,6 +92,7 @@ public class BlockToMineBuilder {
         this.transactionPool = Objects.requireNonNull(transactionPool);
         this.difficultyCalculator = Objects.requireNonNull(difficultyCalculator);
         this.gasLimitCalculator = Objects.requireNonNull(gasLimitCalculator);
+        this.forkDetectionDataCalculator = Objects.requireNonNull(forkDetectionDataCalculator);
         this.validationRules = Objects.requireNonNull(validationRules);
         this.clock = Objects.requireNonNull(clock);
         this.blockFactory = blockFactory;
@@ -182,6 +186,7 @@ public class BlockToMineBuilder {
         boolean forceLimit = miningConfig.getGasLimit().isTargetForced();
         BigInteger gasLimit = gasLimitCalculator.calculateBlockGasLimit(parentGasLimit,
                                                                         gasUsed, minGasLimit, targetGasLimit, forceLimit);
+        byte[] forkDetectionData = forkDetectionDataCalculator.calculate(mainchain);
 
         long blockNumber = newBlockParent.getNumber() + 1;
         final BlockHeader newHeader = blockFactory.newHeader(
@@ -204,6 +209,7 @@ public class BlockToMineBuilder {
                 new byte[]{},
                 new byte[]{},
                 new byte[]{},
+                forkDetectionData,
                 minimumGasPrice.getBytes(),
                 uncles.size()
         );
