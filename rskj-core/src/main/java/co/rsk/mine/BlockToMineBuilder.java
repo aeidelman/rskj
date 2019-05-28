@@ -26,6 +26,7 @@ import co.rsk.core.bc.BlockExecutor;
 import co.rsk.core.bc.BlockHashesHelper;
 import co.rsk.core.bc.FamilyUtils;
 import co.rsk.db.StateRootHandler;
+import co.rsk.panic.PanicProcessor;
 import co.rsk.remasc.RemascTransaction;
 import co.rsk.validators.BlockValidationRule;
 import org.ethereum.config.blockchain.upgrades.ActivationConfig;
@@ -61,6 +62,7 @@ public class BlockToMineBuilder {
     private final MinerClock clock;
     private final BlockFactory blockFactory;
     private final BlockExecutor executor;
+    private static final PanicProcessor panicProcessor = new PanicProcessor();
 
     private final MinimumGasPriceCalculator minimumGasPriceCalculator;
     private final MinerUtils minerUtils;
@@ -156,9 +158,22 @@ public class BlockToMineBuilder {
             List<Transaction> txs,
             Coin minimumGasPrice,
             byte[] extraData) {
-        final BlockHeader newHeader = createHeader(newBlockParent, uncles, txs, minimumGasPrice, extraData);
-        final Block newBlock = blockFactory.newBlock(newHeader, txs, uncles, false);
-        return validationRules.isValid(newBlock) ? newBlock : blockFactory.newBlock(newHeader, txs, Collections.emptyList(), false);
+        BlockHeader newHeader = createHeader(newBlockParent, uncles, txs, minimumGasPrice, extraData);
+        Block newBlock = blockFactory.newBlock(newHeader, txs, uncles, false);
+
+        //TODO: This is a compromise solution, just to improve what was before
+        // A better solution would validate all the uncles before creating the block and then create the block (which we assume is valid now)
+        if(!validationRules.isValid(newBlock)){
+
+            // Some validation rule failed (all validations run are related with uncles rules),
+            // log the panic, and create again the block without uncles to avoid fail abruptly.
+            panicProcessor.panic("buildBlock", "some validation failed trying to create a new block");
+
+            newHeader = createHeader(newBlockParent, Collections.emptyList(), txs, minimumGasPrice, extraData);
+            return blockFactory.newBlock(newHeader, txs, Collections.emptyList(), false);
+        }
+
+        return newBlock;
     }
 
     private BlockHeader createHeader(
